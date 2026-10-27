@@ -97,3 +97,10 @@ let compact=false;try{compact=localStorage.getItem('veckoapp-compact')==='1'}cat
 function applyCompact(){document.body.classList.toggle('compact-view',compact);$('compactToggle').textContent=compact?'Visa hela appen':'Visa kompakt läge'}
 $('compactToggle').onclick=()=>{compact=!compact;try{localStorage.setItem('veckoapp-compact',compact?'1':'0')}catch{}applyCompact()};
 applyCompact();
+
+// Share only schedule configuration with the Scriptable widget (not MP3 files).
+$('widgetCopy').onclick=async()=>{
+  const payload=JSON.stringify({format:'veckoapp-web-v1',days:data});
+  try{await navigator.clipboard.writeText(payload);alert('Widgetdata kopierad! Öppna Scriptable på din iPhone, kör Veckoapp-Widget och välj Importera från urklipp.');}
+  catch{const field=document.createElement('textarea');field.value=payload;field.style.position='fixed';field.style.top='0';field.style.left='0';document.body.append(field);field.focus();field.select();const ok=document.execCommand('copy');field.remove();alert(ok?'Widgetdata kopierad! Öppna Scriptable och importera från urklipp.':'Kopieringen misslyckades. Öppna sidan i Safari och försök igen.');}
+};
