@@ -1,0 +1,22 @@
+'use strict';
+const KEY='veckoapp-web-v1',names=['Måndag','Tisdag','Onsdag','Torsdag','Fredag','Lördag','Söndag'];
+const $=id=>document.getElementById(id);
+const defaults=()=>({start:-1,end:-1,mode:0,manual:420,lead:60});
+let data;try{data=JSON.parse(localStorage.getItem(KEY))||{}}catch{data={}}
+let parity=isoWeek(new Date())%2,day=(new Date().getDay()+6)%7,clipboard=null;
+function isoWeek(d){const x=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));x.setUTCDate(x.getUTCDate()+4-(x.getUTCDay()||7));const y=new Date(Date.UTC(x.getUTCFullYear(),0,1));return Math.ceil((((x-y)/86400000)+1)/7)}
+function slot(p,d){return String(p)+'_'+String(d)}
+function get(p,d){return {...defaults(),...(data[slot(p,d)]||{})}}
+function persist(){localStorage.setItem(KEY,JSON.stringify(data))}
+function clock(m){return m<0?'':String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')}
+function minutes(v){if(!/^\d\d:\d\d$/.test(v))return -1;const [h,m]=v.split(':').map(Number);return h<24&&m<60?h*60+m:-1}
+function render(){const now=new Date(),w=isoWeek(now);$('today').textContent=new Intl.DateTimeFormat('sv-SE',{weekday:'long',day:'numeric',month:'long'}).format(now);$('week').textContent=w;$('parityLabel').textContent=w%2?'Udda vecka':'Jämn vecka';const today=get(w%2,(now.getDay()+6)%7);$('todayShift').textContent=today.start<0?'Idag: Ledig':'Idag: '+clock(today.start)+' – '+clock(today.end);document.querySelectorAll('[data-parity]').forEach(b=>{b.classList.toggle('active',Number(b.dataset.parity)===parity)});$('days').replaceChildren();for(let i=0;i<7;i++){const v=get(parity,i),b=document.createElement('button');b.className='day'+(i===day?' selected':'');b.innerHTML='<span><span class="name">'+names[i]+'</span><small>'+(['Inget alarm','Manuellt alarm','Automatiskt alarm','Dubbla alarm'][v.mode]||'Inget alarm')+'</small></span><span class="time">'+(v.start<0?'Ledig':clock(v.start)+' – '+clock(v.end))+'</span>';b.onclick=()=>{day=i;render()};$('days').append(b)}const v=get(parity,day);$('editTitle').textContent=names[day];$('off').checked=v.start<0;$('start').value=clock(v.start);$('end').value=clock(v.end);$('mode').value=String(v.mode);$('manual').value=clock(v.manual);$('lead').value=v.lead;$('start').disabled=$('end').disabled=v.start<0;$('paste').disabled=!clipboard}
+function save(){const v=get(parity,day);if($('off').checked){v.start=-1;v.end=-1}else{v.start=minutes($('start').value);v.end=minutes($('end').value);if(v.start<0)v.start=540;if(v.end<0)v.end=1020}v.mode=Number($('mode').value);v.manual=minutes($('manual').value);if(v.manual<0)v.manual=420;v.lead=Math.max(0,Math.min(720,Number($('lead').value)||0));data[slot(parity,day)]=v;persist();render()}
+$('off').onchange=()=>{if(!$('off').checked){$('start').value='09:00';$('end').value='17:00'}save()};
+for(const id of ['start','end','mode','manual','lead'])$(id).addEventListener('change',save);
+document.querySelectorAll('[data-parity]').forEach(b=>b.onclick=()=>{parity=Number(b.dataset.parity);render()});
+$('copy').onclick=()=>{clipboard=structuredClone(get(parity,day));$('paste').disabled=false;$('saved').textContent='Dag kopierad (inklusive alarm)'};
+$('paste').onclick=()=>{if(!clipboard)return;data[slot(parity,day)]=structuredClone(clipboard);persist();render()};
+$('export').onclick=()=>{const blob=new Blob([JSON.stringify({format:'veckoapp-web-v1',days:data},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='veckoapp-schema.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+$('import').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const o=JSON.parse(await f.text());if(o.format!=='veckoapp-web-v1'||!o.days||typeof o.days!=='object'||Array.isArray(o.days))throw Error('Fel filformat');const clean={};for(let p=0;p<2;p++)for(let d=0;d<7;d++){const x=o.days[slot(p,d)];if(!x)continue;const v={};for(const field of ['start','end','mode','manual','lead']){if(!Number.isInteger(x[field]))throw Error('Ogiltigt schema');v[field]=x[field]}if(v.start < -1||v.start>1439||v.end < -1||v.end>1439||v.mode<0||v.mode>3||v.manual<0||v.manual>1439||v.lead<0||v.lead>720)throw Error('Ogiltiga tider');clean[slot(p,d)]=v}if(!confirm('Ersätta nuvarande schema med det importerade?'))return;data=clean;persist();render()}catch(err){alert('Kunde inte importera: '+err.message)}finally{e.target.value=''}};
+render();if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
