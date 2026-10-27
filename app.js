@@ -24,11 +24,12 @@ $('selectAll').onclick=()=>{if(pasteSelection.size===14)pasteSelection.clear();e
 $('applyPaste').onclick=()=>{if(!clipboard||!pasteSelection.size){alert('Markera minst en dag.');return}const count=pasteSelection.size;if(!confirm('Ersätta schemat för '+count+' markerade dagar, inklusive alarm?'))return;for(const key of pasteSelection)data[key]=structuredClone(clipboard);persist();pasteSelection.clear();$('pastePanel').hidden=true;render();$('saved').textContent='Klistrade in på '+count+' dagar'};
 $('export').onclick=()=>{const blob=new Blob([JSON.stringify({format:'veckoapp-web-v1',days:data},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='veckoapp-schema.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
 $('import').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const o=JSON.parse(await f.text());if(o.format!=='veckoapp-web-v1'||!o.days||typeof o.days!=='object'||Array.isArray(o.days))throw Error('Fel filformat');const clean={};for(let p=0;p<2;p++)for(let d=0;d<7;d++){const x=o.days[slot(p,d)];if(!x)continue;const v={};for(const field of ['start','end','mode','manual','lead']){if(!Number.isInteger(x[field]))throw Error('Ogiltigt schema');v[field]=x[field]}if(v.start < -1||v.start>1439||v.end < -1||v.end>1439||v.mode<0||v.mode>3||v.manual<0||v.manual>1439||v.lead<0||v.lead>720)throw Error('Ogiltiga tider');v.musicId=typeof x.musicId==='string'&&x.musicId.length<100?x.musicId:'';clean[slot(p,d)]=v}if(!confirm('Ersätta nuvarande schema med det importerade?'))return;data=clean;persist();render()}catch(err){alert('Kunde inte importera: '+err.message)}finally{e.target.value=''}};
-render();initMusic().catch(e=>{$('musicStatus').textContent='Musikbiblioteket kunde inte öppnas: '+e.message});if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+render();if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
 
 
 // Music files are kept in this browser's IndexedDB, never uploaded to the website.
 const MUSIC_DB='veckoapp-music-v1',MUSIC_STORE='tracks';
+initMusic().catch(e=>{$('musicStatus').textContent='Musikbiblioteket kunde inte öppnas: '+e.message});
 function musicRequest(req){return new Promise((resolve,reject)=>{req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
 async function initMusic(){
   musicDb=await new Promise((resolve,reject)=>{const req=indexedDB.open(MUSIC_DB,1);req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(MUSIC_STORE))req.result.createObjectStore(MUSIC_STORE,{keyPath:'id'})};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)});
