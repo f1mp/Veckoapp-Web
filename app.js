@@ -78,3 +78,21 @@ $('musicUpload').onchange=async e=>{
   }catch(err){$('musicStatus').textContent='Kunde inte spara filerna. Kontrollera ledigt lagringsutrymme: '+err.message}
   finally{e.target.value=''}
 };
+
+
+// A home-screen shortcut and an optional compact, widget-like view.
+let deferredInstallPrompt=null;
+window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstallPrompt=event});
+function installInstructions(){
+  const ios=/iPad|iPhone|iPod/.test(navigator.userAgent);
+  const standalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+  $('installText').textContent=standalone?'Veckoapp är redan öppnad från hemskärmen.':ios?'Öppna sidan i Safari, tryck på Dela (fyrkanten med pil uppåt) och välj Lägg till på hemskärmen. Välj sedan Lägg till. Det skapar en appikon, inte en riktig iOS-widget.':deferredInstallPrompt?'Tryck på Installera appen för att lägga Veckoapp på hemskärmen.':'Öppna webbläsarens meny och välj Lägg till på startskärmen eller Installera app. Det skapar en genväg, inte en riktig widget.';
+  $('nativeInstall').hidden=!deferredInstallPrompt||standalone;
+}
+$('installHelp').onclick=()=>{$('installPanel').hidden=false;installInstructions()};
+$('closeInstall').onclick=()=>{$('installPanel').hidden=true};
+$('nativeInstall').onclick=async()=>{if(!deferredInstallPrompt)return;const prompt=deferredInstallPrompt;deferredInstallPrompt=null;await prompt.prompt();installInstructions()};
+let compact=false;try{compact=localStorage.getItem('veckoapp-compact')==='1'}catch{}
+function applyCompact(){document.body.classList.toggle('compact-view',compact);$('compactToggle').textContent=compact?'Visa hela appen':'Visa kompakt läge'}
+$('compactToggle').onclick=()=>{compact=!compact;try{localStorage.setItem('veckoapp-compact',compact?'1':'0')}catch{}applyCompact()};
+applyCompact();
